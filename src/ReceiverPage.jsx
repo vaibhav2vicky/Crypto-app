@@ -29,20 +29,20 @@ export default function ReceiverPage() {
       setError('Please enter a decryption key.');
       return;
     }
-  
+
     setError(null);
     setIsLoading(true);
     setDecryptedMessage('');
     setDecryptedImage(null);
     setImageUrl('');
-  
+
     try {
       const response = await fetch('http://localhost:5000/api/receive');
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-  
+
       const data = await response.json();
       console.log('Received data:', data);
-  
+
       // Handle message decryption
       if (data.message) {
         let decrypted;
@@ -68,8 +68,14 @@ export default function ReceiverPage() {
           case 'otp':
             decrypted = decryptotp(data.message, key);
             break;
+          case 'railfence':
+              decrypted = decryptRailFence(data.message, key);
+              break;
           case 'des':
             decrypted = decryptdes(data.message, key);
+            break;
+          case 'columnar':
+            decrypted = decryptColumnar(data.message, key);
             break;
           case 'rc4':
             decrypted = decryptRC4(data.message, key);
@@ -77,31 +83,31 @@ export default function ReceiverPage() {
           case 'rsa':
             decrypted = await decryptRSA(key, data.message);
             break;
-            case 'ecc':
-              try {
-                // First parse the outer JSON
-                const receivedData = typeof data.message === 'string' 
-                  ? JSON.parse(data.message) 
-                  : data.message;
-                
-                // The actual ECC data might be stringified again inside
-                const eccData = typeof receivedData === 'string'
-                  ? JSON.parse(receivedData)
-                  : receivedData;
-                
-                // Validate required fields
-                if (!eccData.ciphertext || !eccData.iv || !eccData.ephemeralPublicKey) {
-                  console.log('Received ECC data:', eccData);
-                  throw new Error('Invalid ECC data format - missing required fields');
-                }
-                
-                decrypted = await decryptECC(key, eccData);
-              } catch (eccError) {
-                console.error('ECC Decryption error:', eccError);
-                throw new Error(`ECC decryption failed: ${eccError.message}`);
+          case 'ecc':
+            try {
+              // First parse the outer JSON
+              const receivedData = typeof data.message === 'string'
+                ? JSON.parse(data.message)
+                : data.message;
+
+              // The actual ECC data might be stringified again inside
+              const eccData = typeof receivedData === 'string'
+                ? JSON.parse(receivedData)
+                : receivedData;
+
+              // Validate required fields
+              if (!eccData.ciphertext || !eccData.iv || !eccData.ephemeralPublicKey) {
+                console.log('Received ECC data:', eccData);
+                throw new Error('Invalid ECC data format - missing required fields');
               }
-              break;
-            
+
+              decrypted = await decryptECC(key, eccData);
+            } catch (eccError) {
+              console.error('ECC Decryption error:', eccError);
+              throw new Error(`ECC decryption failed: ${eccError.message}`);
+            }
+            break;
+
           case 'aes':
             try {
               // Convert hex string to Uint8Array for AES decryption
@@ -118,15 +124,15 @@ export default function ReceiverPage() {
         }
         setDecryptedMessage(decrypted);
       }
-  
+
       // Handle image decryption
       if (data.image) {
         try {
           const imageResponse = await fetch(`http://localhost:5000${data.image}`);
           if (!imageResponse.ok) throw new Error('Failed to fetch image');
-  
+
           const imageBlob = await imageResponse.blob();
-  
+
           if (data.encryptionType === 'aes') {
             const decryptedBlob = await decryptAES(imageBlob, key);
             setDecryptedImage(decryptedBlob);
