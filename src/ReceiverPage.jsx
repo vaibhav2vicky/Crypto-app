@@ -81,7 +81,7 @@ export default function ReceiverPage() {
             decrypted = decryptRC4(data.message, key);
             break;
           case 'rsa':
-            decrypted = await decryptRSA(key, data.message);
+            decrypted = await decryptRSA(data.message, key);
             break;
           case 'ecc':
               decrypted = await decryptECC(data.message, key);

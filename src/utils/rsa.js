@@ -22,7 +22,7 @@ export async function encryptRSA( publicKeyBase64, message) {
 }
 
 
-export async function decryptRSA(privateKeyBase64, encryptedBase64) {
+export async function decryptRSA( encryptedBase64, privateKeyBase64) {
   try {
     const privateKey = await importPrivateKey(privateKeyBase64);
     const encryptedData = base64ToArrayBuffer(encryptedBase64);

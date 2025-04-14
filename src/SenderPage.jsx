@@ -235,13 +235,23 @@ export default function SenderPage() {
         <label>Key:</label>
 
         <div className="field" style={{ display: 'flex', alignItems: 'center' }}>
-          {encryptionType == 'rsa' || 'ecc' ? (
+          {encryptionType === 'rsa' ? (
             <textarea
               className="input"
               value={key}
               readOnly
               rows={4}
               placeholder="RSA public key will appear here after generation"
+              style={{ flex: 1, marginRight: '8px' }}
+            />
+          ) :
+          encryptionType == 'ecc' ? (
+            <textarea
+              className="input"
+              value={key}
+              readOnly
+              rows={4}
+              placeholder="ecc public key will appear here after generation"
               style={{ flex: 1, marginRight: '8px' }}
             />
           ) : (

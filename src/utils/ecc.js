@@ -58,70 +58,80 @@ export async function encryptECC(publicKeyBase64, message) {
   }
 }
 
+// Helper functions with corrections
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return window.btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  try {
+    const binaryString = window.atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (error) {
+    console.error('Error decoding base64:', error);
+    throw new Error('Invalid base64 string');
+  }
+}
+
+function toBase64(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  return arrayBufferToBase64(data);
+}
+
+function fromBase64(base64) {
+  const buffer = base64ToArrayBuffer(base64);
+  const decoder = new TextDecoder();
+  return decoder.decode(buffer);
+}
+
+// Updated decryptECC function
 export async function decryptECC(encryptedData, privateKeyBase64) {
   try {
-    // Parse if input is string
-    const decode = typeof encryptedData ==='string' ?
-      fromBase64(encryptedData) :
-      encryptedData;
-    
-    
+    // Parse and decode the input data
+    const decoded = typeof encryptedData === 'string' ? fromBase64(encryptedData) : encryptedData;
+    const data = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
 
-    const data = typeof decode === 'string' ?
-      JSON.parse(decode) :
-      decode;
-    console.log(data)
-    // Validate required fields
-    const requiredFields = ['ciphertext', 'iv', 'ephemeralPublicKey'];
-    for (const field of requiredFields) {
-      if (!data[field]) {
-        throw new Error(`Missing required field: ${field}`);
-      }
-    }
-console.log(requiredFields)
     // Validate required fields
     if (!data.ciphertext || !data.iv || !data.ephemeralPublicKey) {
       throw new Error('Invalid encrypted data format');
     }
 
-    // Import private key
+    // Import keys
     const privateKey = await importPrivateKey(privateKeyBase64);
-console.log(privateKey)
-    // Import ephemeral public key
     const ephemeralKey = await importPublicKey(data.ephemeralPublicKey);
-console.log(ephemeralKey)
+
     // Derive shared secret
     const sharedSecret = await window.crypto.subtle.deriveKey(
-      {
-        name: "ECDH",
-        public: ephemeralKey,
-      },
+      { name: "ECDH", public: ephemeralKey },
       privateKey,
-      {
-        name: "AES-GCM",
-        length: 256,
-      },
+      { name: "AES-GCM", length: 256 },
       false,
       ["decrypt"]
     );
-console.log(sharedSecret)
-    // Decrypt message
+
+    // Decrypt the message
     const decrypted = await window.crypto.subtle.decrypt(
-      {
-        name: "AES-GCM",
-        iv: base64ToArrayBuffer(data.iv),
-      },
+      { name: "AES-GCM", iv: base64ToArrayBuffer(data.iv) },
       sharedSecret,
       base64ToArrayBuffer(data.ciphertext)
     );
-console.log(decrypted)
+
     return new TextDecoder().decode(decrypted);
   } catch (error) {
-    console.error('Error in ECC decryption:', error);
+    console.error('Decryption error:', error);
     throw new Error('Decryption failed: ' + error.message);
   }
 }
-
 // Helper functions (same as RSA)
 async function exportPublicKey(publicKey) {
   const exported = await window.crypto.subtle.exportKey("spki", publicKey);
@@ -155,35 +165,3 @@ async function importPrivateKey(base64Key) {
   );
 }
 
-function arrayBufferToBase64(buffer) {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return window.btoa(binary);
-}
-
-function base64ToArrayBuffer(base64) {
-  try {
-    // First ensure the base64 string is properly padded
-    const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
-    const binaryString = window.atob(paddedBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-  } catch (error) {
-    console.error('Error decoding base64:', error);
-    throw new Error('Invalid base64 string');
-  }
-}
-
-function toBase64(str) {
-  return window.btoa(unescape(encodeURIComponent(str)));
-}
-
-function fromBase64(base64) {
-  return decodeURIComponent(escape(window.atob(base64)));
-}
