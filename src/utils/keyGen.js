@@ -137,7 +137,7 @@ export function arrayBufferToBase64(buffer) {
   }
   return window.btoa(binary);
 }
-
+//ECC
 export async function generateECCKeys() {
   try {
     const keyPair = await window.crypto.subtle.generateKey(

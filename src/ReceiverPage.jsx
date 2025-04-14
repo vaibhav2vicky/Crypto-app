@@ -84,28 +84,7 @@ export default function ReceiverPage() {
             decrypted = await decryptRSA(key, data.message);
             break;
           case 'ecc':
-            try {
-              // First parse the outer JSON
-              const receivedData = typeof data.message === 'string'
-                ? JSON.parse(data.message)
-                : data.message;
-
-              // The actual ECC data might be stringified again inside
-              const eccData = typeof receivedData === 'string'
-                ? JSON.parse(receivedData)
-                : receivedData;
-
-              // Validate required fields
-              if (!eccData.ciphertext || !eccData.iv || !eccData.ephemeralPublicKey) {
-                console.log('Received ECC data:', eccData);
-                throw new Error('Invalid ECC data format - missing required fields');
-              }
-
-              decrypted = await decryptECC(key, eccData);
-            } catch (eccError) {
-              console.error('ECC Decryption error:', eccError);
-              throw new Error(`ECC decryption failed: ${eccError.message}`);
-            }
+              decrypted = await decryptECC(data.message, key);
             break;
 
           case 'aes':

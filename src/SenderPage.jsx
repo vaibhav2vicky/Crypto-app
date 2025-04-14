@@ -3,7 +3,7 @@ import './styles.css';
 import { caesarCipherEncrypt } from './utils/caesarcipher';
 import { xorEncrypt } from './utils/xor';
 import { monoalphabeticEncrypt } from './utils/monoalphebatic';
-import { generateMonoalphabeticKey, generateHillKey, generatePlayfairKey, generateAESKey, generateDESKey, generateRC4Key, generateRSAKeys } from './utils/keyGen';
+import { generateMonoalphabeticKey, generateHillKey, generatePlayfairKey, generateAESKey, generateDESKey, generateRC4Key, generateRSAKeys, generateECCKeys } from './utils/keyGen';
 import { vigenereEncrypt } from './utils/polyalphabatic';
 import { hillEncrypt } from './utils/hill';
 import { playfairEncrypt } from './utils/playfair';
@@ -15,6 +15,7 @@ import { encryptColumnar } from './utils/columnar';
 import { encryptdes } from './utils/des';
 import { encryptRC4 } from './utils/rc4';
 import { encryptRSA } from './utils/rsa';
+import { encryptECC } from './utils/ecc';
 
 
 export default function SenderPage() {
@@ -31,6 +32,11 @@ export default function SenderPage() {
   const [hash2, setHash2] = useState('');
   const [comparisonResult, setComparisonResult] = useState(null);
   const [rsaKeys, setRsaKeys] = useState({
+    publicKey: '',
+    privateKey: '',
+    generated: false
+  });
+  const [eccKeys, setECCKeys] = useState({
     publicKey: '',
     privateKey: '',
     generated: false
@@ -83,6 +89,17 @@ export default function SenderPage() {
           setKey(keys.publicKey); // Set public key as the default key
         }
         encryptedMessage = await encryptRSA(rsaKeys.publicKey, message);
+      } else if (encryptionType === 'ecc') {
+        if (!rsaKeys.generated) {
+          const keys = await generateECCKeys();
+          setECCKeys({
+            publicKey: keys.publicKey,
+            privateKey: keys.privateKey,
+            generated: true
+          });
+          setKey(keys.publicKey); // Set public key as the default key
+        }
+        encryptedMessage = await encryptECC(eccKeys.publicKey, message);
       } else if (encryptionType === 'railfence') {
         const railKey = parseInt(key, 10);
         if (isNaN(railKey)) {
@@ -218,112 +235,138 @@ export default function SenderPage() {
         <label>Key:</label>
 
         <div className="field" style={{ display: 'flex', alignItems: 'center' }}>
-  {encryptionType === 'rsa' ? (
-    <textarea
-      className="input"
-      value={key}
-      readOnly
-      rows={4}
-      placeholder="RSA public key will appear here after generation"
-      style={{ flex: 1, marginRight: '8px' }}
-    />
-  ) : (
-    <input
-      className="input"
-      type="text"
-      placeholder={
-        encryptionType === 'caesar' ? 'Enter shift number' :
-        encryptionType === 'monoalphabetic' ? 'Enter 26 unique letters' :
-        encryptionType === 'polyalphabetic' ? 'Enter keyword (letters only)' :
-        encryptionType === 'hill' ? 'Enter 4 letters (e.g., "HILL")' :
-        encryptionType === 'playfair' ? 'Enter keyword (e.g., "PLAYFAIR")' :
-        encryptionType === 'aes' ? 'Enter or generate a strong key' :
-        encryptionType === 'otp' ? 'Enter Key same length as the Plain text' :
-        encryptionType === 'railfence' ? 'Enter number of rails (≥ 2)' :
-        encryptionType === 'des' ? 'Enter or generate DES key' :
-        'Enter encryption key'
-      }
-      value={key}
-      onChange={(e) => setKey(e.target.value)}
-      style={{ flex: 1, marginRight: '8px' }}
-    />
-  )}
+          {encryptionType == 'rsa' || 'ecc' ? (
+            <textarea
+              className="input"
+              value={key}
+              readOnly
+              rows={4}
+              placeholder="RSA public key will appear here after generation"
+              style={{ flex: 1, marginRight: '8px' }}
+            />
+          ) : (
+            <input
+              className="input"
+              type="text"
+              placeholder={
+                encryptionType === 'caesar' ? 'Enter shift number' :
+                  encryptionType === 'monoalphabetic' ? 'Enter 26 unique letters' :
+                    encryptionType === 'polyalphabetic' ? 'Enter keyword (letters only)' :
+                      encryptionType === 'hill' ? 'Enter 4 letters (e.g., "HILL")' :
+                        encryptionType === 'playfair' ? 'Enter keyword (e.g., "PLAYFAIR")' :
+                          encryptionType === 'aes' ? 'Enter or generate a strong key' :
+                            encryptionType === 'otp' ? 'Enter Key same length as the Plain text' :
+                              encryptionType === 'railfence' ? 'Enter number of rails (≥ 2)' :
+                                encryptionType === 'des' ? 'Enter or generate DES key' :
+                                  'Enter encryption key'
+              }
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              style={{ flex: 1, marginRight: '8px' }}
+            />
+          )}
 
-  {['monoalphabetic', 'hill', 'playfair', 'aes', 'des', 'otp', 'railfence', 'columnar', 'rc4', 'rsa'].includes(encryptionType) && (
-    <button
-      className="button generate-key"
-      onClick={async () => {
-        switch (encryptionType) {
-          case 'monoalphabetic':
-            setKey(generateMonoalphabeticKey());
-            break;
-          case 'hill':
-            setKey(generateHillKey());
-            break;
-          case 'playfair':
-            setKey(generatePlayfairKey());
-            break;
-          case 'aes':
-            setKey(generateAESKey());
-            break;
-          case 'des':
-            setKey(generateDESKey());
-            break;
-          case 'otp':
-            setKey(Array.from({ length: message.length },
-              () => String.fromCharCode(Math.floor(Math.random() * 26) + 65)).join(''));
-            break;
-          case 'railfence':
-            setKey('3');
-            break;
-          case 'columnar':
-            const words = ['SECRET', 'CIPHER', 'COLUMN', 'TRANSPOSE', 'KEYWORD'];
-            setKey(words[Math.floor(Math.random() * words.length)]);
-            break;
-          case 'rc4':
-            setKey(generateRC4Key());
-            break;
-          case 'rsa':
-            try {
-              const keys = await generateRSAKeys();
-              setRsaKeys({
-                publicKey: keys.publicKey,
-                privateKey: keys.privateKey,
-                generated: true
-              });
-              setKey(keys.publicKey);
-            } catch (err) {
-              setError('Failed to generate RSA keys: ' + err.message);
-              console.error(err);
-            }
-            break;
-          default:
-            setKey('DEFAULTKEY');
-        }
-      }}
-      disabled={
-        (encryptionType === 'otp' && !message) || 
-        (encryptionType === 'rsa' && rsaKeys.generated)
-      }
-    >
-      {encryptionType === 'aes' || encryptionType === 'rsa' 
-        ? 'Generate Secure Key' 
-        : 'Generate Key'}
-    </button>
-  )}
-</div>
+          {['monoalphabetic', 'hill', 'playfair', 'aes', 'des', 'otp', 'railfence', 'columnar', 'rc4', 'rsa', 'ecc'].includes(encryptionType) && (
+            <button
+              className="button generate-key"
+              onClick={async () => {
+                switch (encryptionType) {
+                  case 'monoalphabetic':
+                    setKey(generateMonoalphabeticKey());
+                    break;
+                  case 'hill':
+                    setKey(generateHillKey());
+                    break;
+                  case 'playfair':
+                    setKey(generatePlayfairKey());
+                    break;
+                  case 'aes':
+                    setKey(generateAESKey());
+                    break;
+                  case 'des':
+                    setKey(generateDESKey());
+                    break;
+                  case 'otp':
+                    setKey(Array.from({ length: message.length },
+                      () => String.fromCharCode(Math.floor(Math.random() * 26) + 65)).join(''));
+                    break;
+                  case 'railfence':
+                    setKey('3');
+                    break;
+                  case 'columnar':
+                    const words = ['SECRET', 'CIPHER', 'COLUMN', 'TRANSPOSE', 'KEYWORD'];
+                    setKey(words[Math.floor(Math.random() * words.length)]);
+                    break;
+                  case 'rc4':
+                    setKey(generateRC4Key());
+                    break;
+                  case 'rsa':
+                    try {
+                      const keys = await generateRSAKeys();
+                      setRsaKeys({
+                        publicKey: keys.publicKey,
+                        privateKey: keys.privateKey,
+                        generated: true
+                      });
+                      setKey(keys.publicKey);
+                    } catch (err) {
+                      setError('Failed to generate RSA keys: ' + err.message);
+                      console.error(err);
+                    }
+                    break;
+                  case 'ecc':
+                    try {
+                      const keys = await generateECCKeys();
+                      setECCKeys({
+                        publicKey: keys.publicKey,
+                        privateKey: keys.privateKey,
+                        generated: true
+                      });
+                      setKey(keys.publicKey);
+                    } catch (err) {
+                      setError('Failed to generate RSA keys: ' + err.message);
+                      console.error(err);
+                    }
+                    break;
+                  default:
+                    setKey('DEFAULTKEY');
+                }
+              }}
+              disabled={
+                (encryptionType === 'otp' && !message) ||
+                (encryptionType === 'rsa' && rsaKeys.generated) ||
+                (encryptionType === 'ecc' && eccKeys.generated)
+              }
+            >
+              {encryptionType === 'aes' || encryptionType === 'rsa'
+                ? 'Generate Secure Key'
+                : 'Generate Key'}
+            </button>
+          )}
+        </div>
 
-{encryptionType === 'rsa' && rsaKeys.generated && (
-  <div className="field" style={{ marginTop: '10px' }}>
-    <label>Private Key (keep secure):</label>
-    <textarea
-      className="input"
-      value={rsaKeys.privateKey}
-      readOnly
-      rows={4}
-    />
-  </div>
-)}
+        {encryptionType === 'rsa' && rsaKeys.generated && (
+          <div className="field" style={{ marginTop: '10px' }}>
+            <label>Private Key (keep secure):</label>
+            <textarea
+              className="input"
+              value={rsaKeys.privateKey}
+              readOnly
+              rows={4}
+            />
+          </div>
+        )}
+        {encryptionType === 'ecc' && eccKeys.generated && (
+          <div className="field" style={{ marginTop: '10px' }}>
+            <label>Private Key (keep secure):</label>
+            <textarea
+              className="input"
+              value={eccKeys.privateKey}
+              readOnly
+              rows={4}
+            />
+          </div>
+        )}
       </div>
       <div className="field">
         <label>Plaintext:</label>

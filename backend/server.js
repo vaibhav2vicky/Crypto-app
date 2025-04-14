@@ -82,6 +82,9 @@ app.get('/api/receive', (req, res) => {
         available: false 
       });
     }
+    if (messageData.messageType === 'ecc' && messageData.message) {
+      messageData.message = messageData.message.replace(/'/g, '');
+    }
     
     const responseData = { 
       ...messageData,
