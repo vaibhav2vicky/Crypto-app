@@ -74,8 +74,8 @@ export default function SenderPage() {
         encryptedMessage = encryptotp(message, key);
       } else if (encryptionType === 'columnar') {
         encryptedMessage = encryptColumnar(message, key);
-      } else if (encryptionType === 'columnar') {
-        encryptedMessage = encryptColumnar(message, key);
+      } else if (encryptionType === 'des') {
+        encryptedMessage = encryptdes(message, key);
       } else if (encryptionType === 'rc4') {
         encryptedMessage = encryptRC4(message, key);
       } else if (encryptionType === 'rsa') {
@@ -245,7 +245,7 @@ export default function SenderPage() {
               style={{ flex: 1, marginRight: '8px' }}
             />
           ) :
-          encryptionType == 'ecc' ? (
+          encryptionType === 'ecc' ? (
             <textarea
               className="input"
               value={key}
