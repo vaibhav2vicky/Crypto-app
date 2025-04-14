@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { caesarCipherDecrypt } from './utils/caesarcipher';
 import { xorDecrypt } from './utils/xor';
@@ -7,6 +7,14 @@ import { vigenereDecrypt } from './utils/polyalphabatic';
 import { hillDecrypt } from './utils/hill';
 import { playfairDecrypt } from './utils/playfair';
 import { decryptAES } from './utils/aes';
+import { decryptotp } from './utils/otp';
+import { decryptRailFence } from './utils/railfence';
+import { decryptColumnar } from './utils/columnar';
+import { decryptdes } from './utils/des';
+import { decryptRC4 } from './utils/rc4';
+import { decryptRSA } from './utils/rsa';
+import { decryptECC } from './utils/ecc';
+import './styles.css';
 
 export default function ReceiverPage() {
   const [decryptedMessage, setDecryptedMessage] = useState('');
@@ -57,6 +65,43 @@ export default function ReceiverPage() {
           case 'playfair':
             decrypted = playfairDecrypt(data.message, key);
             break;
+          case 'otp':
+            decrypted = decryptotp(data.message, key);
+            break;
+          case 'des':
+            decrypted = decryptdes(data.message, key);
+            break;
+          case 'rc4':
+            decrypted = decryptRC4(data.message, key);
+            break;
+          case 'rsa':
+            decrypted = await decryptRSA(key, data.message);
+            break;
+            case 'ecc':
+              try {
+                // First parse the outer JSON
+                const receivedData = typeof data.message === 'string' 
+                  ? JSON.parse(data.message) 
+                  : data.message;
+                
+                // The actual ECC data might be stringified again inside
+                const eccData = typeof receivedData === 'string'
+                  ? JSON.parse(receivedData)
+                  : receivedData;
+                
+                // Validate required fields
+                if (!eccData.ciphertext || !eccData.iv || !eccData.ephemeralPublicKey) {
+                  console.log('Received ECC data:', eccData);
+                  throw new Error('Invalid ECC data format - missing required fields');
+                }
+                
+                decrypted = await decryptECC(key, eccData);
+              } catch (eccError) {
+                console.error('ECC Decryption error:', eccError);
+                throw new Error(`ECC decryption failed: ${eccError.message}`);
+              }
+              break;
+            
           case 'aes':
             try {
               // Convert hex string to Uint8Array for AES decryption
@@ -114,7 +159,7 @@ export default function ReceiverPage() {
     document.body.removeChild(a);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     document.title = "Receiver Page | Secure Message Encryption";
 
     return () => {
@@ -125,17 +170,18 @@ export default function ReceiverPage() {
   }, [imageUrl]);
 
   return (
-    <div className='container'>
+    <div className="container">
       <Helmet>
         <title>Receiver Page | Secure Message Encryption</title>
       </Helmet>
 
-      <h1 className='title'>Receiver Page</h1>
+      <h1 className="title">Receiver Page</h1>
 
-      <div className='field'>
+      <div className="field">
         <label>Decryption Key:</label>
         <input
-          className='input'
+          className="input"
+          type="text"
           value={key}
           onChange={(e) => setKey(e.target.value)}
           placeholder="Enter the decryption key"
@@ -150,31 +196,31 @@ export default function ReceiverPage() {
         {isLoading ? 'Loading...' : 'Fetch and Decrypt Message'}
       </button>
 
-      {error && <p className='error'>{error}</p>}
+      {error && <p className="error">{error}</p>}
 
-      <div className='results-section'>
-        <div className='message-result'>
+      <div className="results-section">
+        <div className="message-result">
           <h2>Decrypted Message:</h2>
-          <div className='decrypted-message'>
+          <div className="decrypted-message">
             {decryptedMessage || 'No message decrypted yet'}
           </div>
         </div>
 
         {imageUrl && (
-          <div className='image-result'>
+          <div className="image-result">
             <h2>Decrypted Image:</h2>
-            <div className='image-container'>
-              <div className='image-wrapper'>
+            <div className="image-container">
+              <div className="image-wrapper">
                 <img
                   src={imageUrl}
                   alt="Decrypted content"
-                  className='decrypted-image'
+                  className="decrypted-image"
                   onError={() => setError('Failed to load image')}
                 />
-              </div><br></br>
+              </div>
+              <br />
               <button
-                style={{ alignSelf: 'center' }}
-                className='download-button button'
+                className="button download-button"
                 onClick={handleDownloadImage}
               >
                 Download Image

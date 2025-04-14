@@ -4,7 +4,7 @@ function prepareKey(key) {
 }
 
 // Encrypt function
-export function encrypt(text, key) {
+export function encryptotp(text, key) {
     text = text.toUpperCase().replace(/[^A-Z]/g, '');
     key = prepareKey(key);
     let cipherText = '';
@@ -23,7 +23,7 @@ export function encrypt(text, key) {
 }
 
 // Decrypt function
-export function decrypt(text, key) {
+export function decryptotp(text, key) {
     key = prepareKey(key);
     let plainText = '';
     

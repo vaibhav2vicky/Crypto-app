@@ -1,68 +1,175 @@
-// Elliptic Curve Cryptography (ECC) - Point Arithmetic
-// Define the secp256k1 curve parameters
-const CURVE = {
-    P: 2n ** 256n - 0x1000003d1n,  // Field prime
-    N: 2n ** 256n - 0x14551231950b75fc4402da1732fc9bebfn, // Group order
-    a: 0n,
-    b: 7n
-};
+export async function encryptECC(publicKeyBase64,message) {
+    try {
+      // Generate ephemeral key pair
+      const ephemeralKeyPair = await window.crypto.subtle.generateKey(
+        {
+          name: "ECDH",
+          namedCurve: "P-256",
+        },
+        true,
+        ["deriveKey"]
+      );
+  
+      // Import recipient's public key
+      const recipientPublicKey = await importPublicKey(publicKeyBase64);
+  
+      // Derive shared secret
+      const sharedSecret = await window.crypto.subtle.deriveKey(
+        {
+          name: "ECDH",
+          public: recipientPublicKey,
+        },
+        ephemeralKeyPair.privateKey,
+        {
+          name: "AES-GCM",
+          length: 256,
+        },
+        false,
+        ["encrypt"]
+      );
+  
+      // Encrypt message with AES-GCM
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const encodedMessage = new TextEncoder().encode(message);
+      const encrypted = await window.crypto.subtle.encrypt(
+        {
+          name: "AES-GCM",
+          iv,
+        },
+        sharedSecret,
+        encodedMessage
+      );
+  
+      // Export ephemeral public key
+      const ephemeralPublicKey = await exportPublicKey(ephemeralKeyPair.publicKey);
 
-// Modular arithmetic helper functions
-function mod(a, b) {
-    return (a % b + b) % b;
-}
-
-function modInverse(a, p) {
-    let m0 = p, t, q;
-    let x0 = 0n, x1 = 1n;
-    if (p === 1n) return 0n;
-    while (a > 1n) {
-        q = a / p;
-        t = p, p = a % p, a = t;
-        t = x0, x0 = x1 - q * x0, x1 = t;
+      const result = {
+        ciphertext: arrayBufferToBase64(encrypted),
+        iv: arrayBufferToBase64(iv),
+        ephemeralPublicKey,
+        algorithm: 'ECC-AES-GCM', // Add metadata
+        timestamp: Date.now()
+      };
+  
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error("Error encrypting with ECC:", error);
+      throw error;
     }
-    return x1 < 0n ? x1 + m0 : x1;
-}
-
-// Point Addition on the Elliptic Curve
-function addPoints(P1, P2, curve) {
-    if (!P1) return P2;
-    if (!P2) return P1;
+  }
+  
+  export async function decryptECC(encryptedData, privateKeyBase64) {
+    try {
+        // Parse if input is string
+        const data = typeof encryptedData === 'string' ? 
+          JSON.parse(encryptedData) : 
+          encryptedData;
     
-    const [x1, y1] = P1, [x2, y2] = P2;
-    const { P } = curve;
-    
-    if (x1 === x2 && y1 === y2) {
-        const lam = mod((3n * x1 ** 2n * modInverse(2n * y1, P)), P);
-        return computeNewPoint(lam, x1, x2, y1, P);
-    } else {
-        const lam = mod((y2 - y1) * modInverse(x2 - x1, P), P);
-        return computeNewPoint(lam, x1, x2, y1, P);
+        // Validate required fields
+        const requiredFields = ['ciphertext', 'iv', 'ephemeralPublicKey'];
+        for (const field of requiredFields) {
+          if (!data[field]) {
+            throw new Error(`Missing required field: ${field}`);
+          }
+        }
+  
+      // Validate required fields
+      if (!data.ciphertext || !data.iv || !data.ephemeralPublicKey) {
+        throw new Error('Invalid encrypted data format');
+      }
+  
+      // Import private key
+      const privateKey = await importPrivateKey(privateKeyBase64);
+      
+      // Import ephemeral public key
+      const ephemeralKey = await importPublicKey(data.ephemeralPublicKey);
+      
+      // Derive shared secret
+      const sharedSecret = await window.crypto.subtle.deriveKey(
+        {
+          name: "ECDH",
+          public: ephemeralKey,
+        },
+        privateKey,
+        {
+          name: "AES-GCM",
+          length: 256,
+        },
+        false,
+        ["decrypt"]
+      );
+      
+      // Decrypt message
+      const decrypted = await window.crypto.subtle.decrypt(
+        {
+          name: "AES-GCM",
+          iv: base64ToArrayBuffer(data.iv),
+        },
+        sharedSecret,
+        base64ToArrayBuffer(data.ciphertext)
+      );
+      
+      return new TextDecoder().decode(decrypted);
+    } catch (error) {
+      console.error('Error in ECC decryption:', error);
+      throw new Error('Decryption failed: ' + error.message);
     }
-}
-
-// Compute new point after addition
-function computeNewPoint(lam, x1, x2, y1, P) {
-    const x3 = mod(lam ** 2n - x1 - x2, P);
-    const y3 = mod(lam * (x1 - x3) - y1, P);
-    return [x3, y3];
-}
-
-// Point Multiplication on the Elliptic Curve
-function multiplyPoint(P, n, curve) {
-    let R = null;
-    let Q = P;
-    
-    while (n > 0n) {
-        if (n & 1n) R = addPoints(R, Q, curve);
-        Q = addPoints(Q, Q, curve);
-        n >>= 1n;
+  }
+  
+  // Helper functions (same as RSA)
+  async function exportPublicKey(publicKey) {
+    const exported = await window.crypto.subtle.exportKey("spki", publicKey);
+    return arrayBufferToBase64(exported);
+  }
+  
+  async function exportPrivateKey(privateKey) {
+    const exported = await window.crypto.subtle.exportKey("pkcs8", privateKey);
+    return arrayBufferToBase64(exported);
+  }
+  
+  async function importPublicKey(base64Key) {
+    const binaryKey = base64ToArrayBuffer(base64Key);
+    return await window.crypto.subtle.importKey(
+      "spki",
+      binaryKey,
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      []
+    );
+  }
+  
+  async function importPrivateKey(base64Key) {
+    const binaryKey = base64ToArrayBuffer(base64Key);
+    return await window.crypto.subtle.importKey(
+      "pkcs8",
+      binaryKey,
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveKey", "deriveBits"]
+    );
+  }
+  
+  function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
-    
-    return R;
-}
-
-// Example Usage: Generate Public Key
-export function generatePublicKey(privateKey, G, curve) {
-    return multiplyPoint(G, privateKey, curve);
-}
+    return window.btoa(binary);
+  }
+  
+  function base64ToArrayBuffer(base64) {
+    try {
+      // First ensure the base64 string is properly padded
+      const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+      const binaryString = window.atob(paddedBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    } catch (error) {
+      console.error('Error decoding base64:', error);
+      throw new Error('Invalid base64 string');
+    }
+  }

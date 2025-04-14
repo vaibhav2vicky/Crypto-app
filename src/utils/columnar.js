@@ -9,7 +9,7 @@ function prepareKey(key) {
 }
 
 // Columnar Transposition Cipher Encryption
-export function encrypt(text, key) {
+export function encryptColumnar(text, key) {
     text = prepareText(text);
     key = prepareKey(key);
     let cipher = "";
@@ -41,7 +41,7 @@ export function encrypt(text, key) {
 }
 
 // Columnar Transposition Cipher Decryption
-export function decrypt(text, key) {
+export function decryptColumnar(text, key) {
     key = prepareKey(key);
     let msg = "";
     let k_indx = 0;

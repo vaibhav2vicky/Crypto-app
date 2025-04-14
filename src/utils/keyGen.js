@@ -71,3 +71,95 @@ export function generateAESKey() {
   return Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+export function generateDESKey() {
+  // 8 random bytes (64 bits) as hex string
+  const keyBytes = new Uint8Array(8);
+  window.crypto.getRandomValues(keyBytes);
+  return Array.from(keyBytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+export function generateRC4Key(length = 16) {
+  // Generate a random key of the specified length (default 16 bytes)
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let key = '';
+  for (let i = 0; i < length; i++) {
+    key += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return key;
+}
+
+
+// utils/keyGen.js (add these to your existing file)
+
+export async function generateRSAKeys(keySize = 2048) {
+  try {
+    const keyPair = await window.crypto.subtle.generateKey(
+      {
+        name: "RSA-OAEP",
+        modulusLength: keySize,
+        publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
+        hash: "SHA-256",
+      },
+      true,
+      ["encrypt", "decrypt"]
+    );
+    
+    const publicKey = await exportPublicKey(keyPair.publicKey);
+    const privateKey = await exportPrivateKey(keyPair.privateKey);
+    
+    return {
+      publicKeyObj: keyPair.publicKey,
+      privateKeyObj: keyPair.privateKey,
+      publicKey,
+      privateKey
+    };
+  } catch (error) {
+    console.error("Error generating RSA keys:", error);
+    throw error;
+  }
+}
+
+async function exportPublicKey(publicKey) {
+  const exported = await window.crypto.subtle.exportKey("spki", publicKey);
+  return arrayBufferToBase64(exported);
+}
+
+async function exportPrivateKey(privateKey) {
+  const exported = await window.crypto.subtle.exportKey("pkcs8", privateKey);
+  return arrayBufferToBase64(exported);
+}
+
+export function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
+export async function generateECCKeys() {
+  try {
+    const keyPair = await window.crypto.subtle.generateKey(
+      {
+        name: "ECDH",
+        namedCurve: "P-256", // Using secp256r1 (NIST P-256)
+      },
+      true,
+      ["deriveKey", "deriveBits"]
+    );
+
+    const publicKey = await exportPublicKey(keyPair.publicKey);
+    const privateKey = await exportPrivateKey(keyPair.privateKey);
+
+    return {
+      publicKeyObj: keyPair.publicKey,
+      privateKeyObj: keyPair.privateKey,
+      publicKey,
+      privateKey
+    };
+  } catch (error) {
+    console.error("Error generating ECC keys:", error);
+    throw error;
+  }
+}
